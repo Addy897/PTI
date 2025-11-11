@@ -1,14 +1,9 @@
-#include "client.hpp"
-#include "message.hpp"
+#include "includes/client.hpp"
+#include "includes/message.hpp"
 #include <atomic>
-#include <cstdint>
-#include <string>
-#include <synchapi.h>
 #include <thread>
-#include <vector>
 #include <winerror.h>
 #include <winsock2.h>
-
 std::atomic<bool> running(true);
 Client::Client() {
   WORD version = MAKEWORD(2, 2);
@@ -27,22 +22,29 @@ Client::Client() {
 void Client::conn(std::string addr, int port) {
 
   if (addr.empty()) {
-    throw std::runtime_error("hostname is NULL");
+    throw std::runtime_error("address is NULL");
   }
 
   client_addr.sin_family = AF_INET;
   client_addr.sin_port = htons(port);
   client_addr.sin_addr.s_addr = inet_addr(addr.c_str());
-  if (connect(client, (SOCKADDR *)&client_addr, sizeof(client_addr))) {
+  int ret = connect(client, (SOCKADDR *)&client_addr, sizeof(client_addr));
+  if (ret == SOCKET_ERROR) {
 
     throw std::runtime_error("connection failed.");
+  }
+  u_long mode = 1;
+  ret = ioctlsocket(client, FIONBIO, &mode);
+  if (ret != NO_ERROR) {
+    printf("ioctlsocket failed with error: %d\n", ret);
+    closesocket(client);
   }
 }
 int Client::write(std::vector<uint8_t> data) {
   return send(client, (char *)data.data(), data.size(), 0);
 }
-int Client::read(size_t len, uint8_t buf[]) {
-  return recv(client, (char *)buf, len, 0);
+int Client::read(size_t len, uint8_t buf[], int flags) {
+  return recv(client, (char *)buf, len, flags);
 }
 void Client::close() {
   if (client != INVALID_SOCKET) {
@@ -67,11 +69,16 @@ void read_thread(Client &c) {
         running.store(false);
         printf("\nServer Closed\n");
         break;
-      }
-      printf("Read error: %d\n", ret);
+      } else if (ret == WSAEWOULDBLOCK) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+      } else
+        printf("Read error: %d\n", ret);
     } else {
       Message m = Message::fromBytes(std::vector<uint8_t>{buf, buf + read});
+      printf("\n");
       print_message(m);
+      printf("\n");
     }
   }
 }
@@ -82,7 +89,7 @@ int main() {
   std::thread t([]() { read_thread(c); });
   while (running.load()) {
     std::cout << ">> ";
-    std::cin >> input;
+    std::getline(std::cin, input);
     if (input == "SEND") {
       std::cout << "Enter type: ";
       std::getline(std::cin, input);
@@ -91,7 +98,7 @@ int main() {
       if (m.getType() == Message::MessageType::DATA ||
           m.getType() == Message::MessageType::JOIN_ROOM) {
         std::cout << "Enter data: ";
-        std::cin >> input;
+        std::getline(std::cin, input);
         m.setData(input);
       }
       if (m.getType() != Message::MessageType::EMPTY) {

@@ -1,5 +1,5 @@
 #pragma once
-#include <mutex>
+#include <atomic>
 #include <string>
 #include <winsock2.h>
 #define CHUNK_SIZE 1024
@@ -10,14 +10,13 @@ public:
   void start();
   virtual void handler(SOCKET client);
   void close();
-  int m_total_clients;
+  std::atomic<int> m_total_clients;
 
 protected:
   std::string m_hostname;
   int m_port;
 
   void show_clients();
-  std::mutex m_total_clients_mutex;
   WSAData m_wsdata;
   SOCKET m_server;
   sockaddr_in m_server_addr = {0};

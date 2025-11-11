@@ -1,6 +1,4 @@
-#include "message.hpp"
-#include <cstdint>
-#include <cstdio>
+#include "includes/message.hpp"
 #include <map>
 Message::Message(MessageType type) { m_type = type; }
 void Message::setData(std::string data) {

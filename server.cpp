@@ -1,10 +1,7 @@
-#include "server.hpp"
-#include <mutex>
-#include <psdk_inc/_socket_types.h>
-#include <stdexcept>
+#include "includes/server.hpp"
+#include <functional>
 #include <thread>
 #include <vector>
-#include <winsock2.h>
 Server::Server(std::string hostname, int port) {
   WORD version = MAKEWORD(2, 2);
   int ret = WSAStartup(version, &m_wsdata);
@@ -26,7 +23,7 @@ void Server::show_clients() {
   while (true) {
     if (last != m_total_clients) {
       system("cls");
-      printf("client: %d\n", m_total_clients);
+      printf("client: %d\n", m_total_clients.load());
       last = m_total_clients;
     }
   }
@@ -73,7 +70,11 @@ void Server::start() {
       continue;
     }
 
-    threads.emplace_back([this, client]() { this->handler(client); });
+    threads.emplace_back([this, client]() {
+      m_total_clients.fetch_add(1);
+      this->handler(client);
+      m_total_clients.fetch_sub(1);
+    });
   }
 
   for (auto &t : threads) {
@@ -83,10 +84,6 @@ void Server::start() {
   }
 }
 void Server::handler(SOCKET client) {
-  {
-    std::lock_guard<std::mutex> lock(m_total_clients_mutex);
-    m_total_clients++;
-  }
   while (true) {
     uint8_t buf[CHUNK_SIZE] = {0};
     int read = recv(client, (char *)buf, CHUNK_SIZE, 0);
@@ -97,10 +94,6 @@ void Server::handler(SOCKET client) {
     }
   }
   closesocket(client);
-  {
-    std::lock_guard<std::mutex> lock(m_total_clients_mutex);
-    m_total_clients--;
-  }
 }
 void Server::close() {
   if (m_server != INVALID_SOCKET) {

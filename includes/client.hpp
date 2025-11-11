@@ -11,7 +11,7 @@ public:
   void conn(std::string hostname, int port);
   void close();
   int write(std::vector<uint8_t>);
-  int read(size_t, uint8_t[]);
+  int read(size_t, uint8_t[], int flags = 0);
 
 protected:
   WSAData wsdata;
