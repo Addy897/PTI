@@ -2,9 +2,58 @@
 #include "includes/message.hpp"
 #include <atomic>
 #include <iostream>
+#include <mutex>
+#include <random>
 #include <thread>
-#include <vector>
+#include <winsock2.h>
 std::atomic<bool> running(true);
+void SignalServer::handle_message(SOCKET client, Message &m) {
+  switch ((int)m.getType()) {
+  case Message::CREATE_ROOM: {
+    SOCKADDR_IN addr;
+    int size = sizeof(addr);
+    int read = getpeername(client, (SOCKADDR *)&addr, &size);
+    if (read != SOCKET_ERROR) {
+      char *c = inet_ntoa(addr.sin_addr);
+      std::string id;
+      std::random_device rd;
+      std::mt19937 g(rd());
+      std::uniform_int_distribution<int> dist(100000, 999999);
+      {
+        std::lock_guard<std::mutex> lg(m_room_mutex);
+        do {
+          id = std::to_string(dist(g));
+        } while (m_rooms.contains(id));
+        m_rooms[id] = c;
+      }
+      Message ms(Message::DATA);
+      ms.setData(id);
+      write(client, ms.toBytes());
+      break;
+    }
+    break;
+  }
+  case Message::ROOMS: {
+
+    std::string data;
+    {
+      std::lock_guard<std::mutex> g(m_room_mutex);
+      for (auto &i : m_rooms) {
+        data.append(i.first);
+        data.append("\n");
+      }
+    }
+    Message ms(Message::DATA);
+    ms.setData(data);
+    write(client, ms.toBytes());
+    break;
+  }
+  }
+}
+
+int SignalServer::write(SOCKET c, std::vector<uint8_t> data) {
+  return send(c, (char *)data.data(), data.size(), 0);
+}
 void SignalServer::handler(SOCKET client) {
   while (running.load()) {
     uint8_t buf[CHUNK_SIZE] = {0};
@@ -12,13 +61,13 @@ void SignalServer::handler(SOCKET client) {
     if (read == 0) {
       break;
     } else if (read > 0) {
-      send(client, (char *)buf, read, 0);
       Message m = Message::fromBytes(std::vector<uint8_t>{buf, buf + read});
-      print_message(m);
+      handle_message(client, m);
     }
   }
   closesocket(client);
 }
+
 void handle_cli(SignalServer &s) {
   std::string in;
   while (running.load()) {
@@ -32,7 +81,7 @@ void handle_cli(SignalServer &s) {
   }
 }
 int main() {
-  static SignalServer s("127.0.0.1", 4444);
+  static SignalServer s("", 4444);
   std::thread t([]() { handle_cli(s); });
   s.start();
   atexit([]() { s.close(); });

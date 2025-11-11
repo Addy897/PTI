@@ -1,5 +1,4 @@
 #include "includes/server.hpp"
-#include <functional>
 #include <thread>
 #include <vector>
 Server::Server(std::string hostname, int port) {
