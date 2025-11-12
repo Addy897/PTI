@@ -27,6 +27,7 @@ public:
   std::vector<uint8_t> toBytes();
   MessageType getType();
   std::vector<uint8_t> getData();
+  std::string getDataAsString();
 };
 void print_message(Message &m);
 Message::MessageType message_from_string(std::string);

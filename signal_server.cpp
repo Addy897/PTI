@@ -4,6 +4,7 @@
 #include <iostream>
 #include <mutex>
 #include <random>
+#include <string>
 #include <thread>
 #include <winsock2.h>
 std::atomic<bool> running(true);
@@ -29,7 +30,22 @@ void SignalServer::handle_message(SOCKET client, Message &m) {
       Message ms(Message::DATA);
       ms.setData(id);
       write(client, ms.toBytes());
-      break;
+    }
+    break;
+  }
+  case Message::JOIN_ROOM: {
+    if (m.getData().size() > 0) {
+      std::string id = m.getDataAsString();
+      if (id.ends_with('\0'))
+        id.pop_back();
+      Message ms(Message::DATA);
+      {
+        std::lock_guard<std::mutex> lg(m_room_mutex);
+        if (m_rooms.contains(id)) {
+          ms.setData(m_rooms[id]);
+        }
+      }
+      write(client, ms.toBytes());
     }
     break;
   }
@@ -75,6 +91,10 @@ void handle_cli(SignalServer &s) {
     std::getline(std::cin, in);
     if (in == "CONN") {
       std::cout << "Total Clients: " << s.m_total_clients.load() << "\n";
+    } else if (in == "ROOMS") {
+      for (auto &it : s.m_rooms) {
+        std::cout << it.first << ": " << it.second << "\n";
+      }
     } else if (in == "q") {
       running.store(false);
     }

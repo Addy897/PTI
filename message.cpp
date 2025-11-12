@@ -15,7 +15,10 @@ std::vector<uint8_t> Message::toBytes() {
 
 Message::MessageType Message::getType() { return m_type; }
 std::vector<uint8_t> Message::getData() { return m_data; }
+std::string Message::getDataAsString() {
 
+  return std::string{m_data.begin(), m_data.end()};
+}
 Message Message::fromBytes(std::vector<uint8_t> data) {
   if (data.size() < 1)
     return Message(EMPTY);
