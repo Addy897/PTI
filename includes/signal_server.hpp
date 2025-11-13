@@ -7,7 +7,7 @@
 class SignalServer : public Server {
 public:
   SignalServer(std::string hostname, int port) : Server(hostname, port) {}
-  void handler(SOCKET) override;
+  void defaultHandler(SOCKET) override;
   void handle_message(SOCKET client, Message &m);
   int write(SOCKET c, std::vector<uint8_t>);
   std::map<std::string, std::string> m_rooms;

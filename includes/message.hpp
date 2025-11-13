@@ -5,13 +5,15 @@
 class Message {
 public:
   enum MessageType {
-    GET_ROOMS,
+    EMPTY = 0,
     ROOMS,
     DATA,
     CREATE_ROOM,
     JOIN_ROOM,
     EXIT_ROOM,
-    EMPTY = 0,
+    ERR,
+    PEER_HLO,
+    HLO_ACK,
   };
 
 private:

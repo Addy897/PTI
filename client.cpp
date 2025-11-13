@@ -1,10 +1,6 @@
 #include "includes/client.hpp"
-#include "includes/message.hpp"
-#include <atomic>
-#include <thread>
 #include <winerror.h>
 #include <winsock2.h>
-std::atomic<bool> running(true);
 Client::Client() {
   WORD version = MAKEWORD(2, 2);
   int ret = WSAStartup(version, &wsdata);
@@ -21,6 +17,8 @@ Client::Client() {
 }
 void Client::conn(std::string addr, int port) {
 
+  if (client == INVALID_SOCKET)
+    throw std::runtime_error("invalid socket.");
   if (addr.empty()) {
     throw std::runtime_error("address is NULL");
   }
@@ -33,17 +31,16 @@ void Client::conn(std::string addr, int port) {
 
     throw std::runtime_error("connection failed.");
   }
-  // u_long mode = 1;
-  // ret = ioctlsocket(client, FIONBIO, &mode);
-  // if (ret != NO_ERROR) {
-  //   printf("ioctlsocket failed with error: %d\n", ret);
-  //   closesocket(client);
-  // }
 }
 int Client::write(std::vector<uint8_t> data) {
+  if (client == INVALID_SOCKET)
+    return SOCKET_ERROR;
   return send(client, (char *)data.data(), data.size(), 0);
 }
 int Client::read(size_t len, uint8_t buf[], int flags) {
+
+  if (client == INVALID_SOCKET)
+    return SOCKET_ERROR;
   return recv(client, (char *)buf, len, flags);
 }
 void Client::close() {
@@ -55,104 +52,4 @@ void Client::close() {
 Client::~Client() {
   close();
   WSACleanup();
-}
-void read_thread(Client &c) {
-  while (running.load()) {
-    uint8_t buf[CHUNK_SIZE];
-    int read = c.read(CHUNK_SIZE, buf);
-    if (read == 0) {
-      running.store(false);
-      printf("\nServer Closed\n");
-    } else if (read < 0) {
-      int ret = WSAGetLastError();
-      if (ret == WSAECONNRESET) {
-        running.store(false);
-        printf("\nServer Closed\n");
-        break;
-      } else if (ret == WSAEWOULDBLOCK) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-      } else
-        printf("Read error: %d\n", ret);
-    } else {
-      Message m = Message::fromBytes(std::vector<uint8_t>{buf, buf + read});
-      printf("\n");
-      print_message(m);
-      printf("\n");
-    }
-  }
-}
-Message get_message(Client &c) {
-
-  uint8_t buf[CHUNK_SIZE];
-  int read = c.read(CHUNK_SIZE, buf);
-  Message m(Message::EMPTY);
-  if (read == 0) {
-    running.store(false);
-    printf("\nServer Closed\n");
-  } else if (read < 0) {
-    int ret = WSAGetLastError();
-    if (ret == WSAECONNRESET) {
-      running.store(false);
-      printf("\nServer Closed\n");
-    } else
-      printf("Read error: %d\n", ret);
-  } else {
-    m = Message::fromBytes(std::vector<uint8_t>{buf, buf + read});
-  }
-  return m;
-}
-void handle_message(Message &m, Client &c) {
-  int type = m.getType();
-  std::string data;
-  switch (type) {
-  case Message::DATA: {
-    std::cout << "Enter data: ";
-    std::getline(std::cin, data);
-    m.setData(data);
-    c.write(m.toBytes());
-    break;
-  }
-  case Message::CREATE_ROOM: {
-    c.write(m.toBytes());
-    Message m1 = get_message(c);
-    printf("ID: %s\n", m1.getDataAsString().c_str());
-    break;
-  }
-  case Message::ROOMS: {
-    c.write(m.toBytes());
-    Message m1 = get_message(c);
-    printf("ROOMS: %s\n", m1.getDataAsString().c_str());
-    break;
-  }
-  case Message::JOIN_ROOM: {
-    std::cout << "Enter ROOM ID: ";
-    std::getline(std::cin, data);
-    m.setData(data);
-    print_message(m);
-    c.write(m.toBytes());
-    Message m1 = get_message(c);
-    printf("PEER: %s\n", m1.getDataAsString().c_str());
-    break;
-  }
-  }
-}
-int main() {
-  static Client c;
-  c.conn("127.0.0.1", 4444);
-  std::string input;
-  // std::thread t([]() { read_thread(c); });
-  while (running.load()) {
-    std::cout << ">> ";
-    std::getline(std::cin, input);
-    if (input == "q") {
-      running.store(false);
-    }
-    Message m(message_from_string(input));
-    if (m.getType() != Message::EMPTY)
-      handle_message(m, c);
-  }
-  // if (t.joinable())
-  //   t.join();
-  c.close();
 }

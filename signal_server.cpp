@@ -36,13 +36,12 @@ void SignalServer::handle_message(SOCKET client, Message &m) {
   case Message::JOIN_ROOM: {
     if (m.getData().size() > 0) {
       std::string id = m.getDataAsString();
-      if (id.ends_with('\0'))
-        id.pop_back();
       Message ms(Message::DATA);
       {
         std::lock_guard<std::mutex> lg(m_room_mutex);
         if (m_rooms.contains(id)) {
           ms.setData(m_rooms[id]);
+          m_rooms.erase(id);
         }
       }
       write(client, ms.toBytes());
@@ -70,7 +69,7 @@ void SignalServer::handle_message(SOCKET client, Message &m) {
 int SignalServer::write(SOCKET c, std::vector<uint8_t> data) {
   return send(c, (char *)data.data(), data.size(), 0);
 }
-void SignalServer::handler(SOCKET client) {
+void SignalServer::defaultHandler(SOCKET client) {
   while (running.load()) {
     uint8_t buf[CHUNK_SIZE] = {0};
     int read = recv(client, (char *)buf, CHUNK_SIZE, 0);

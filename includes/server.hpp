@@ -1,16 +1,21 @@
 #pragma once
 #include <atomic>
+#include <functional>
 #include <string>
 #include <winsock2.h>
 #define CHUNK_SIZE 1024
 class Server {
 public:
   Server(std::string hostname, int port);
+  Server() {}
+  void setHandler(std::function<void(SOCKET)>);
   ~Server();
-  void start();
-  virtual void handler(SOCKET client);
+  virtual void defaultHandler(SOCKET client);
+  void start(bool non_block = false);
   void close();
+  std::function<void(SOCKET)> m_handler;
   std::atomic<int> m_total_clients;
+  std::atomic<bool> m_running;
 
 protected:
   std::string m_hostname;

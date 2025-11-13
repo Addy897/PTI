@@ -1,6 +1,10 @@
 #include "includes/server.hpp"
+#include <functional>
+#include <iostream>
 #include <thread>
 #include <vector>
+#include <winerror.h>
+#include <winsock2.h>
 Server::Server(std::string hostname, int port) {
   WORD version = MAKEWORD(2, 2);
   int ret = WSAStartup(version, &m_wsdata);
@@ -19,7 +23,7 @@ Server::Server(std::string hostname, int port) {
 }
 void Server::show_clients() {
   int last = -1;
-  while (true) {
+  while (m_running.load()) {
     if (last != m_total_clients) {
       system("cls");
       printf("client: %d\n", m_total_clients.load());
@@ -27,8 +31,10 @@ void Server::show_clients() {
     }
   }
 }
-void Server::start() {
+void Server::setHandler(std::function<void(SOCKET)> h) { m_handler = h; }
+void Server::start(bool non_block) {
   u_long ip;
+
   if (m_hostname.empty()) {
     ip = INADDR_ANY;
   } else {
@@ -38,10 +44,14 @@ void Server::start() {
   m_server_addr.sin_family = AF_INET;
   m_server_addr.sin_port = htons(m_port);
   m_server_addr.sin_addr.s_addr = ip;
-  if (bind(m_server, (SOCKADDR *)&m_server_addr, sizeof(m_server_addr))) {
-    throw std::runtime_error("connection failed.");
+
+  int ret = bind(m_server, (SOCKADDR *)&m_server_addr, sizeof(m_server_addr));
+  if (ret == SOCKET_ERROR) {
+    ret = WSAGetLastError();
+    std::cout << "Bind failed " << ret << "\n";
+    return;
   }
-  int ret = listen(m_server, 5);
+  ret = listen(m_server, 5);
   if (ret == SOCKET_ERROR) {
     ret = WSAGetLastError();
     switch (ret) {
@@ -51,27 +61,36 @@ void Server::start() {
     default: {
       char error[100];
       sprintf_s(error, "listen failed on port :%d ret :%d.", m_port, ret);
+
       throw std::runtime_error(error);
     }
     }
   }
   SOCKET client;
-
   std::vector<std::thread> threads;
+  if (non_block) {
 
-  printf("Server started %s:%d\n", m_hostname.c_str(), m_port);
-  //  std::thread t([this]() { this->show_clients(); });
-  while (true) {
+    u_long mode = 1;
+    ioctlsocket(m_server, FIONBIO, &mode);
+  }
+  m_running.store(true);
+  while (m_running.load()) {
     int client = accept(m_server, NULL, NULL);
     if (client == INVALID_SOCKET) {
       int err = WSAGetLastError();
-      perror("accept");
+      if (err != WSAEWOULDBLOCK) {
+        printf("err : %d\n", err);
+        perror("accept");
+      }
       continue;
     }
 
     threads.emplace_back([this, client]() {
       m_total_clients.fetch_add(1);
-      this->handler(client);
+      if (this->m_handler)
+        this->m_handler(client);
+      else
+        this->defaultHandler(client);
       m_total_clients.fetch_sub(1);
     });
   }
@@ -82,7 +101,7 @@ void Server::start() {
     }
   }
 }
-void Server::handler(SOCKET client) {
+void Server::defaultHandler(SOCKET client) {
   while (true) {
     uint8_t buf[CHUNK_SIZE] = {0};
     int read = recv(client, (char *)buf, CHUNK_SIZE, 0);
@@ -100,8 +119,8 @@ void Server::close() {
     m_server = INVALID_SOCKET;
   }
 }
+
 Server::~Server() {
   close();
   WSACleanup();
-  printf("CleanUp\n");
 }

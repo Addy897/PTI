@@ -17,15 +17,17 @@ Message::MessageType Message::getType() { return m_type; }
 std::vector<uint8_t> Message::getData() { return m_data; }
 std::string Message::getDataAsString() {
 
-  return std::string{m_data.begin(), m_data.end()};
+  std::string s(m_data.begin(), m_data.end());
+  if (s.ends_with('\0'))
+    s.pop_back();
+  return s;
 }
 Message Message::fromBytes(std::vector<uint8_t> data) {
   if (data.size() < 1)
     return Message(EMPTY);
   MessageType type = static_cast<MessageType>(data[0]);
   Message m(type);
-  if ((type == Message::DATA || type == Message::JOIN_ROOM) &&
-      data.size() > 2) {
+  if (data.size() > 2) {
 
     m.setData(std::vector<uint8_t>{data.begin() + 2, data.end()});
   }
@@ -49,6 +51,12 @@ void print_message(Message &m) {
     break;
   case Message::EMPTY:
     printf("EMTPY\n");
+    break;
+  case Message::PEER_HLO:
+    printf("PEER_HLO\n");
+    break;
+  case Message::HLO_ACK:
+    printf("HLO_ACK\n");
     break;
   }
   printf("Data: ");
