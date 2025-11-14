@@ -1,6 +1,4 @@
 #include "includes/client.hpp"
-#include <winerror.h>
-#include <winsock2.h>
 Client::Client() {
   WORD version = MAKEWORD(2, 2);
   int ret = WSAStartup(version, &wsdata);

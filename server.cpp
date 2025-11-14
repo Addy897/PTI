@@ -3,8 +3,6 @@
 #include <iostream>
 #include <thread>
 #include <vector>
-#include <winerror.h>
-#include <winsock2.h>
 Server::Server(std::string hostname, int port) {
   WORD version = MAKEWORD(2, 2);
   int ret = WSAStartup(version, &m_wsdata);

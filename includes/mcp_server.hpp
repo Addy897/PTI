@@ -1,8 +1,8 @@
 #pragma once
+#include "win.h"
 #include <atomic>
 #include <functional>
 #include <string>
-#include <winsock2.h>
 
 class MCPServer {
 public:

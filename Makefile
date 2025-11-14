@@ -1,4 +1,4 @@
-CFLAGS = -std=c++23 
+CFLAGS = -std=c++23  -Llib/
 LDFLAGS = -lws2_32
 EXECUTABLE = main
 
@@ -7,16 +7,10 @@ all: client server
 $(EXECUTABLE): $(EXECUTABLE).cpp
 	g++ $(EXECUTABLE).cpp client.cpp server.cpp -o $(EXECUTABLE).exe $(CFLAGS) $(LDFLAGS)
 
-message: message.cpp
-	g++ message.cpp -DMESSAGE -o message.exe $(CFLAGS) $(LDFLAGS)
-run: client
-	 ./client.exe
-
-server: server.cpp
-	 g++ server.cpp -o server.exe $(CFLAGS) $(LDFLAGS)
 pti_client: pti_client.cpp
-	 g++ pti_client.cpp client.cpp mcp_server.cpp message.cpp -o pti_client.exe $(CFLAGS) $(LDFLAGS)
-client: client.cpp
-	 g++ client.cpp message.cpp -o client.exe $(CFLAGS) $(LDFLAGS)
+	 g++ -DPTI_CLI pti_client.cpp client.cpp mcp_server.cpp message.cpp -o pti_client.exe $(CFLAGS) $(LDFLAGS)
+
+pti_gui: pti_gui.cpp
+	g++ pti_gui.cpp pti_client.cpp client.cpp mcp_server.cpp message.cpp -o pti_gui.exe $(CFLAGS) $(LDFLAGS) -lraylib -lgdi32 -lwinmm
 signal_server: signal_server.cpp
 	g++ signal_server.cpp message.cpp server.cpp -o signal_server.exe $(CFLAGS) $(LDFLAGS)

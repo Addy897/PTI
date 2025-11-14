@@ -1,8 +1,8 @@
 #pragma once
+#include "win.h"
 #include <cstdint>
 #include <iostream>
 #include <vector>
-#include <winsock2.h>
 #define CHUNK_SIZE 1024
 class Client {
 public:

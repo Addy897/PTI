@@ -1,9 +1,6 @@
 #include "includes/pti_client.hpp"
 #include "includes/message.hpp"
-#include <psdk_inc/_socket_types.h>
 #include <thread>
-#include <winerror.h>
-#include <winsock2.h>
 PTI::PTI(std::string ip) {
   m_server_ip = ip;
   m_mcp_server = std::make_unique<MCPServer>();
@@ -170,7 +167,7 @@ void PTI::start() {
 
   m_client.conn(m_server_ip, m_server_port);
 }
-
+#ifdef PTI_CLI
 int main() {
   PTI pti("127.0.0.1");
   pti.start();
@@ -193,3 +190,4 @@ int main() {
     }
   }
 }
+#endif
