@@ -1,19 +1,18 @@
 #include "includes/pti_client.hpp"
 #include "includes/message.hpp"
-#include "includes/server.hpp"
 #include <psdk_inc/_socket_types.h>
 #include <thread>
 #include <winerror.h>
 #include <winsock2.h>
 PTI::PTI(std::string ip) {
   m_server_ip = ip;
-  m_mcp_server = std::make_unique<Server>("", m_listen_port);
+  m_mcp_server = std::make_unique<MCPServer>();
 }
-PTI::PTI() { m_mcp_server = std::make_unique<Server>("", m_listen_port); }
+PTI::PTI() { m_mcp_server = std::make_unique<MCPServer>(); }
 PTI::PTI(std::string ip, int port) {
   m_server_ip = ip;
   m_server_port = port;
-  m_mcp_server = std::make_unique<Server>("", m_listen_port);
+  m_mcp_server = std::make_unique<MCPServer>();
 }
 Message PTI::getMessage(SOCKET c) {
   uint8_t buf[CHUNK_SIZE];

@@ -1,11 +1,10 @@
-#include "includes/server.hpp"
+#include "includes/mcp_server.hpp"
 #include <functional>
 #include <iostream>
+#include <stdexcept>
 #include <thread>
 #include <vector>
-#include <winerror.h>
-#include <winsock2.h>
-Server::Server(std::string hostname, int port) {
+MCPServer::MCPServer() {
   WORD version = MAKEWORD(2, 2);
   int ret = WSAStartup(version, &m_wsdata);
   if (ret) {
@@ -13,28 +12,17 @@ Server::Server(std::string hostname, int port) {
     sprintf_s(error, "WSA initialization failed: %d.", ret);
     throw std::runtime_error(error);
   }
-  m_total_clients = 0;
+}
+
+void MCPServer::setHandler(std::function<void(SOCKET)> handler) {
+  m_handler = handler;
+}
+void MCPServer::start(bool non_block) {
   m_server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (m_server == INVALID_SOCKET) {
     throw std::runtime_error("socket init failed.");
   }
-  m_hostname = hostname;
-  m_port = port;
-}
-void Server::show_clients() {
-  int last = -1;
-  while (m_running.load()) {
-    if (last != m_total_clients) {
-      system("cls");
-      printf("client: %d\n", m_total_clients.load());
-      last = m_total_clients;
-    }
-  }
-}
-void Server::setHandler(std::function<void(SOCKET)> h) { m_handler = h; }
-void Server::start() {
   u_long ip;
-
   if (m_hostname.empty()) {
     ip = INADDR_ANY;
   } else {
@@ -68,6 +56,11 @@ void Server::start() {
   }
   SOCKET client;
   std::vector<std::thread> threads;
+  if (non_block) {
+
+    u_long mode = 1;
+    ioctlsocket(m_server, FIONBIO, &mode);
+  }
   m_running.store(true);
   while (m_running.load()) {
     int client = accept(m_server, NULL, NULL);
@@ -81,12 +74,8 @@ void Server::start() {
     }
 
     threads.emplace_back([this, client]() {
-      m_total_clients.fetch_add(1);
       if (this->m_handler)
         this->m_handler(client);
-      else
-        this->defaultHandler(client);
-      m_total_clients.fetch_sub(1);
     });
   }
   for (auto &t : threads) {
@@ -94,27 +83,16 @@ void Server::start() {
       t.join();
     }
   }
-}
-void Server::defaultHandler(SOCKET client) {
-  while (true) {
-    uint8_t buf[CHUNK_SIZE] = {0};
-    int read = recv(client, (char *)buf, CHUNK_SIZE, 0);
-    if (read == 0) {
-      break;
-    } else if (read > 0) {
-      printf("Client: %s\n", buf);
-    }
-  }
-  closesocket(client);
-}
-void Server::close() {
   if (m_server != INVALID_SOCKET) {
     closesocket(m_server);
     m_server = INVALID_SOCKET;
   }
 }
 
-Server::~Server() {
-  close();
+MCPServer::~MCPServer() {
+  if (m_server != INVALID_SOCKET) {
+    closesocket(m_server);
+    m_server = INVALID_SOCKET;
+  }
   WSACleanup();
 }

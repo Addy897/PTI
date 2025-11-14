@@ -3,25 +3,20 @@
 #include <functional>
 #include <string>
 #include <winsock2.h>
-#define CHUNK_SIZE 1024
-class Server {
+
+class MCPServer {
 public:
-  Server(std::string hostname, int port);
-  Server() {}
+  MCPServer();
+  void start(bool non_block = true);
+  ~MCPServer();
   void setHandler(std::function<void(SOCKET)>);
-  ~Server();
-  virtual void defaultHandler(SOCKET client);
-  void start();
-  void close();
   std::function<void(SOCKET)> m_handler;
-  std::atomic<int> m_total_clients;
   std::atomic<bool> m_running;
 
-protected:
-  std::string m_hostname;
-  int m_port;
+private:
+  std::string m_hostname = "";
+  int m_port = 1234;
 
-  void show_clients();
   WSAData m_wsdata;
   SOCKET m_server;
   sockaddr_in m_server_addr = {0};

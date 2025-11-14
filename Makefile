@@ -15,7 +15,7 @@ run: client
 server: server.cpp
 	 g++ server.cpp -o server.exe $(CFLAGS) $(LDFLAGS)
 pti_client: pti_client.cpp
-	 g++ pti_client.cpp client.cpp server.cpp message.cpp -o pti_client.exe $(CFLAGS) $(LDFLAGS)
+	 g++ pti_client.cpp client.cpp mcp_server.cpp message.cpp -o pti_client.exe $(CFLAGS) $(LDFLAGS)
 client: client.cpp
 	 g++ client.cpp message.cpp -o client.exe $(CFLAGS) $(LDFLAGS)
 signal_server: signal_server.cpp
