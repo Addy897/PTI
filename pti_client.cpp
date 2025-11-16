@@ -1,6 +1,12 @@
 #include "includes/pti_client.hpp"
 #include "includes/message.hpp"
 #include <thread>
+
+#include <fstream>
+#include <sstream>
+#include <unordered_set>
+#include <functional> // for std::hash
+
 PTI::PTI(std::string ip) {
   m_server_ip = ip;
   m_mcp_server = std::make_unique<MCPServer>();
@@ -55,29 +61,135 @@ Message PTI::getMessage(Client &c) {
   }
 }
 
-void PTI::clientHandler(std::string peer, std::string id) {
+// Simple salted hash for "privacy" (for real security, use SHA-256 lib)
+std::string PTI::hashIndicator(const std::string& indicator) {
+    static const std::string salt = "pti_demo_salt";
+    std::hash<std::string> hasher;
+    size_t h = hasher(indicator + salt);
+    std::stringstream ss;
+    ss << std::hex << h;
+    return ss.str();
+}
 
+std::vector<std::string> PTI::hashIndicators(const std::vector<std::string>& indicators) {
+    std::vector<std::string> res;
+    res.reserve(indicators.size());
+    for (const auto& ind : indicators) {
+        res.push_back(hashIndicator(ind));
+    }
+    return res;
+}
+
+std::string PTI::joinWithNewlines(const std::vector<std::string>& lines) {
+    std::string out;
+    for (size_t i = 0; i < lines.size(); ++i) {
+        out += lines[i];
+        if (i + 1 < lines.size()) out += "\n";
+    }
+    return out;
+}
+
+std::vector<std::string> PTI::splitLines(const std::string& data) {
+    std::vector<std::string> res;
+    std::stringstream ss(data);
+    std::string line;
+    while (std::getline(ss, line)) {
+        if (!line.empty())
+            res.push_back(line);
+    }
+    return res;
+}
+
+void PTI::loadIndicatorsFromFile(const std::string& path) {
+    std::ifstream in(path);
+    if (!in.is_open()) {
+        std::cerr << "Failed to open indicators file: " << path << "\n";
+        return;
+    }
+    m_indicators.clear();
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty())
+            m_indicators.push_back(line);
+    }
+    std::cout << "Loaded " << m_indicators.size() << " indicators from " << path << "\n";
+}
+
+const std::vector<std::string>& PTI::getLastIntersection() const {
+    return m_lastIntersection;
+}
+
+
+void PTI::clientHandler(std::string peer, std::string id) {
   Client c;
   const int PEER_PORT = 1234;
-  c.conn(peer, 1234);
+  c.conn(peer, PEER_PORT);
+
+  // 1) Handshake: tell peer who we are
   Message m(Message::PEER_HLO);
   m.setData(id);
   c.write(m.toBytes());
+
+  // 2) Wait for ACK
   m = getMessage(c);
   if (m.getType() != Message::HLO_ACK) {
-    printf("Recived unknown type %d instead of %d\n", m.getType(),
+    printf("Received unknown type %d instead of %d\n", m.getType(),
            Message::HLO_ACK);
     return;
   }
-  m = Message(Message::DATA);
-  m.setData("Hello There");
-  c.write(m.toBytes());
-  m = getMessage(c);
-  print_message(m);
-  c.write(m.toBytes());
+
+  // --- NEW: PSI PHASE (initiator) ---
+
+  // Ensure we have indicators loaded
+  if (m_indicators.empty()) {
+      std::cout << "[PSI] Warning: no local indicators loaded.\n";
+  }
+
+  // Hash my indicators
+  auto myHashes = hashIndicators(m_indicators);
+  std::string myHashesStr = joinWithNewlines(myHashes);
+
+  // 3) Send my hashes to peer
+  Message psiMsg(Message::PSI_DATA);
+  psiMsg.setData(myHashesStr);
+  c.write(psiMsg.toBytes());
+
+  // 4) Receive peer's hashes
+  Message peerMsg = getMessage(c);
+  if (peerMsg.getType() != Message::PSI_DATA) {
+      std::cout << "[PSI] Expected PSI_DATA, got type " << peerMsg.getType() << "\n";
+      return;
+  }
+
+  std::string peerHashesStr = peerMsg.getDataAsString();
+  auto peerHashes = splitLines(peerHashesStr);
+
+  // 5) Compute intersection: which of MY indicators are also in peer's set
+  std::unordered_set<std::string> peerSet(peerHashes.begin(), peerHashes.end());
+  m_lastIntersection.clear();
+
+  for (size_t i = 0; i < m_indicators.size(); ++i) {
+      if (i < myHashes.size() && peerSet.count(myHashes[i])) {
+          m_lastIntersection.push_back(m_indicators[i]); // original indicator
+      }
+  }
+
+  // Optionally, send PSI_RESULT back (not strictly needed for both sides to know)
+  Message resultMsg(Message::PSI_RESULT);
+  std::string resultStr = joinWithNewlines(m_lastIntersection);
+  resultMsg.setData(resultStr);
+  c.write(resultMsg.toBytes());
+
+  // Print result locally
+  std::cout << "[PSI] Intersection with peer " << peer << ":\n";
+  for (const auto& ind : m_lastIntersection) {
+      std::cout << "  - " << ind << "\n";
+  }
 }
 
+
 void PTI::serverHandler(SOCKET c) {
+  // 1) Read initial message (PEER_HLO)
   Message m = getMessage(c);
   if (m.getType() == Message::PEER_HLO) {
     std::string id = m.getDataAsString();
@@ -85,26 +197,66 @@ void PTI::serverHandler(SOCKET c) {
     {
       std::lock_guard<std::mutex> lg(m_sessions_mutex);
       if (m_sessions.contains(id) && m_sessions[id] == false) {
+        // Mark session as active or remove, depending on your logic
         m_sessions.erase(id);
       } else {
         closesocket(c);
         return;
       }
     }
+
+    // 2) Send HLO_ACK
     Message m1(Message::HLO_ACK);
     auto data = m1.toBytes();
     int ret = send(c, (char *)data.data(), data.size(), 0);
-
     if (ret == SOCKET_ERROR) {
       ret = WSAGetLastError();
       closesocket(c);
       return;
     }
-    m = getMessage(c);
-    data = m.toBytes();
-    ret = send(c, (char *)data.data(), data.size(), 0);
-    m = getMessage(c);
+
+    // --- NEW: PSI PHASE (responder) ---
+
+    // 3) Receive peer's hashes
+    Message peerMsg = getMessage(c);
+    if (peerMsg.getType() != Message::PSI_DATA) {
+        std::cout << "[PSI] Expected PSI_DATA, got type " << peerMsg.getType() << "\n";
+        closesocket(c);
+        return;
+    }
+
+    std::string peerHashesStr = peerMsg.getDataAsString();
+    auto peerHashes = splitLines(peerHashesStr);
+    std::unordered_set<std::string> peerSet(peerHashes.begin(), peerHashes.end());
+
+    // Ensure we have indicators loaded
+    if (m_indicators.empty()) {
+        std::cout << "[PSI] Warning: no local indicators loaded (responder).\n";
+    }
+
+    // 4) Hash my indicators and send them
+    auto myHashes = hashIndicators(m_indicators);
+    std::string myHashesStr = joinWithNewlines(myHashes);
+    Message myPsi(Message::PSI_DATA);
+    myPsi.setData(myHashesStr);
+    send(c, (char*)myPsi.toBytes().data(), myPsi.toBytes().size(), 0);
+
+    // 5) Compute intersection locally (responder side too)
+    m_lastIntersection.clear();
+    for (size_t i = 0; i < m_indicators.size(); ++i) {
+        if (i < myHashes.size() && peerSet.count(myHashes[i])) {
+            m_lastIntersection.push_back(m_indicators[i]);
+        }
+    }
+
+    std::cout << "[PSI] Intersection (responder side):\n";
+    for (const auto& ind : m_lastIntersection) {
+        std::cout << "  - " << ind << "\n";
+    }
+
+    // Optionally, also read PSI_RESULT from initiator if you wish
   }
+
   closesocket(c);
   {
     std::lock_guard<std::mutex> lg(m_sessions_mutex);
@@ -113,6 +265,7 @@ void PTI::serverHandler(SOCKET c) {
     }
   }
 }
+
 
 Message PTI::getMessage() {
   uint8_t buf[CHUNK_SIZE];
@@ -170,6 +323,7 @@ void PTI::start() {
 #ifdef PTI_CLI
 int main() {
   PTI pti("127.0.0.1");
+  pti.loadIndicatorsFromFile("indicators.txt");
   pti.start();
   std::string input;
   while (pti.m_running.load()) {

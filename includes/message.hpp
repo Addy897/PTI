@@ -14,6 +14,8 @@ public:
     ERR,
     PEER_HLO,
     HLO_ACK,
+    PSI_DATA,
+    PSI_RESULT
   };
 
 private:

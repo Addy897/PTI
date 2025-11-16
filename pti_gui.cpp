@@ -11,6 +11,9 @@ int main() {
   SetTargetFPS(60);
 
   PTI pti("127.0.0.1");
+  
+  pti.loadIndicatorsFromFile("indicators.txt");
+
   bool connected = false;
 
   char joinRoomID[64] = "";

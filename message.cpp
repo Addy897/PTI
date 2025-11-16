@@ -58,6 +58,13 @@ void print_message(Message &m) {
   case Message::HLO_ACK:
     printf("HLO_ACK\n");
     break;
+    case Message::PSI_DATA:
+    printf("PSI_DATA\n");
+    break;
+  case Message::PSI_RESULT:
+    printf("PSI_RESULT\n");
+    break;
+
   }
   printf("Data: ");
   std::vector<uint8_t> bytes = m.getData();
@@ -68,12 +75,13 @@ void print_message(Message &m) {
   printf("===========================\n");
 }
 Message::MessageType message_from_string(std::string type) {
-  std::map<std::string, Message::MessageType> d = {
+   std::map<std::string, Message::MessageType> d = {
       {"DATA", Message::DATA},           {"ROOMS", Message::ROOMS},
       {"JOIN_ROOM", Message::JOIN_ROOM}, {"CREATE_ROOM", Message::CREATE_ROOM},
       {"EMTPY", Message::EMPTY},         {"EXIT_ROOM", Message::EXIT_ROOM},
-
+      {"PSI_DATA", Message::PSI_DATA},   {"PSI_RESULT", Message::PSI_RESULT},
   };
+
   return d[type];
 }
 #ifdef MESSAGE
