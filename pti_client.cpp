@@ -11,70 +11,38 @@ PTI::PTI(std::string ip, int port) {
   m_server_port = port;
   m_mcp_server = std::make_unique<MCPServer>();
 }
-Message PTI::getMessage(SOCKET c) {
-  uint8_t buf[CHUNK_SIZE];
-  int read = recv(c, (char *)buf, CHUNK_SIZE, 0);
-
-  if (read < 0) {
-    int ret = WSAGetLastError();
-    while (ret == WSAEWOULDBLOCK) {
-      Sleep(1000);
-      read = recv(c, (char *)buf, CHUNK_SIZE, 0);
-      if (read > 0)
-        break;
-      ret = WSAGetLastError();
-    }
-  }
-  if (read < 0) {
-    Message m(Message::ERR);
-    m.setData("Read error");
-    return m;
-  } else {
-
-    Message m = Message::fromBytes(std::vector<uint8_t>{buf, buf + read});
-
-    return m;
-  }
-}
-Message PTI::getMessage(Client &c) {
-  uint8_t buf[CHUNK_SIZE];
-  int read = c.read(CHUNK_SIZE, buf, 0);
-
-  if (read < 0) {
-    int ret = WSAGetLastError();
-
-    Message m(Message::ERR);
-    if (ret == WSAECONNRESET) {
-      m.setData("CONNECTION RESET");
-    } else
-      m.setData(std::to_string(ret));
-    return m;
-  } else {
-    Message m = Message::fromBytes(std::vector<uint8_t>{buf, buf + read});
-    return m;
-  }
-}
+Message PTI::getMessage(SOCKET c) { return Message::fromSocket(c); }
 
 void PTI::clientHandler(std::string peer, std::string id) {
 
   Client c;
   const int PEER_PORT = 1234;
   c.conn(peer, 1234);
+  // Handshake
   Message m(Message::PEER_HLO);
   m.setData(id);
   c.write(m.toBytes());
-  m = getMessage(c);
+  m = c.readMessage();
   if (m.getType() != Message::HLO_ACK) {
     printf("Recived unknown type %d instead of %d\n", m.getType(),
            Message::HLO_ACK);
     return;
   }
+
+  // MCP start
+  // Send Single Encrypt A
   m = Message(Message::DATA);
   m.setData("Hello There");
   c.write(m.toBytes());
-  m = getMessage(c);
+
+  // RECV Double Encrypt A & Single Encrypt B
+  m = c.readMessage();
   print_message(m);
+
+  // Send Double Encrypt B
   c.write(m.toBytes());
+
+  // Push the data in the map;
 }
 
 void PTI::serverHandler(SOCKET c) {
@@ -114,27 +82,10 @@ void PTI::serverHandler(SOCKET c) {
   }
 }
 
-Message PTI::getMessage() {
-  uint8_t buf[CHUNK_SIZE];
-  int read = m_client.read(CHUNK_SIZE, buf);
-  Message m(Message::EMPTY);
-  if (read == 0) {
-    m_running.store(false);
-  } else if (read < 0) {
-    int ret = WSAGetLastError();
-    if (ret == WSAECONNRESET) {
-      m_running.store(false);
-    } else
-      printf("Read error: %d\n", ret);
-  } else {
-    m = Message::fromBytes(std::vector<uint8_t>{buf, buf + read});
-  }
-  return m;
-}
 std::string PTI::createROOM() {
   Message m(Message::CREATE_ROOM);
   m_client.write(m.toBytes());
-  Message m1 = getMessage();
+  Message m1 = m_client.readMessage();
   std::string id = m1.getDataAsString();
   {
     std::lock_guard<std::mutex> lg(m_sessions_mutex);
@@ -150,15 +101,16 @@ std::string PTI::createROOM() {
 std::string PTI::getRooms() {
   Message m(Message::ROOMS);
   m_client.write(m.toBytes());
-  Message m1 = getMessage();
+  Message m1 = m_client.readMessage();
   return m1.getDataAsString();
 }
 void PTI::joinRoom(std::string id) {
   Message m(Message::JOIN_ROOM);
   m.setData(id);
   m_client.write(m.toBytes());
-  Message m1 = getMessage();
+  Message m1 = m_client.readMessage();
   std::string peer = m1.getDataAsString();
+
   std::thread t([this, peer, id] { clientHandler(peer, id); });
   t.detach();
 }
