@@ -165,20 +165,6 @@ int main() {
         showFileDialog = false;
       }
     }
-    // if (showFileDialog) {
-    //   GuiGroupBox(Rectangle{250, 150, 400, 150}, "Indicator File");
-    //
-    //   GuiLabel(Rectangle{260, 170, 150, 30}, "File Path:");
-    //   GuiTextBox(Rectangle{260, 200, 200, 30}, indicatorFilePath, 256, true);
-    //
-    //   if (GuiButton(Rectangle{300, 250, 100, 30}, "OK")) {
-
-    //
-    //   if (GuiButton(Rectangle{360, 250, 100, 30}, "Cancel")) {
-    //     showFileDialog = false;
-    //     memset(indicatorFilePath, 0, sizeof(indicatorFilePath));
-    //   }
-    // }
 
     EndDrawing();
   }
