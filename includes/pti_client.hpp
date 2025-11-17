@@ -21,7 +21,9 @@ private:
   std::atomic_bool m_running{false};
   std::mutex m_sessions_mutex;
   std::unordered_map<std::string, bool> m_sessions;
-
+  std::function<void(const std::vector<std::string> &, const std::string &,
+                     const std::string &)>
+      m_result_handler;
   // --- NEW: PSI-related state ---
   std::vector<std::string> m_indicators;       // my local indicators
   std::vector<std::string> m_lastIntersection; // last PSI result
@@ -44,6 +46,9 @@ public:
   std::string createROOM();
   std::string getRooms();
   void joinRoom(std::string);
+  void setResultHandler(
+      std::function<void(const std::vector<std::string> &, const std::string &,
+                         const std::string &)>);
 
   // --- NEW: load indicators and get last intersection ---
   void loadIndicatorsFromFile(const std::string &path);

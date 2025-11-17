@@ -13,6 +13,7 @@ public:
   virtual void defaultHandler(SOCKET client);
   void start();
   void close();
+  bool m_start_non_block = false;
   std::function<void(SOCKET)> m_handler;
   std::atomic<int> m_total_clients;
   std::atomic<bool> m_running;

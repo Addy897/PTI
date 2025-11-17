@@ -12,6 +12,7 @@ public:
   void setHandler(std::function<void(SOCKET)>);
   std::function<void(SOCKET)> m_handler;
   std::atomic<bool> m_running;
+  std::string getPeer(SOCKET &);
 
 private:
   std::string m_hostname = "";

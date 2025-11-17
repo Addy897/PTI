@@ -1,8 +1,10 @@
 #include "includes/server.hpp"
 #include <functional>
 #include <iostream>
+#include <psdk_inc/_socket_types.h>
 #include <thread>
 #include <vector>
+#include <winsock2.h>
 Server::Server(std::string hostname, int port) {
   WORD version = MAKEWORD(2, 2);
   int ret = WSAStartup(version, &m_wsdata);
@@ -63,6 +65,12 @@ void Server::start() {
       throw std::runtime_error(error);
     }
     }
+  }
+  if (m_start_non_block) {
+    u_long mode = 1;
+    ret = ioctlsocket(m_server, FIONBIO, &mode);
+    if (ret == SOCKET_ERROR)
+      printf("Unable to start socket in non block\n");
   }
   SOCKET client;
   std::vector<std::thread> threads;

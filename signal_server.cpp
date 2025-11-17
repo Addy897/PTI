@@ -3,6 +3,7 @@
 #include <atomic>
 #include <iostream>
 #include <mutex>
+#include <psdk_inc/_socket_types.h>
 #include <random>
 #include <string>
 #include <thread>
@@ -67,6 +68,8 @@ void SignalServer::handle_message(SOCKET client, Message &m) {
 }
 
 int SignalServer::write(SOCKET c, std::vector<uint8_t> data) {
+  if (c == INVALID_SOCKET)
+    return SOCKET_ERROR;
   return send(c, (char *)data.data(), data.size(), 0);
 }
 void SignalServer::defaultHandler(SOCKET client) {
@@ -74,7 +77,8 @@ void SignalServer::defaultHandler(SOCKET client) {
     Message m = Message::fromSocket(client);
     handle_message(client, m);
   }
-  closesocket(client);
+  if (client != INVALID_SOCKET)
+    closesocket(client);
 }
 
 void handle_cli(SignalServer &s) {

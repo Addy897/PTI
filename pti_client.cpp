@@ -135,7 +135,8 @@ void PTI::clientHandler(std::string peer, std::string id) {
       m_lastIntersection.push_back(m_indicators[i]); // original indicator
     }
   }
-  // Push the data in the map;
+  if (m_result_handler)
+    m_result_handler(m_lastIntersection, id, peer);
 }
 
 void PTI::serverHandler(SOCKET c) {
@@ -200,6 +201,9 @@ void PTI::serverHandler(SOCKET c) {
         m_lastIntersection.push_back(m_indicators[i]);
       }
     }
+    std::string peer = m_mcp_server->getPeer(c);
+    if (m_result_handler)
+      m_result_handler(m_lastIntersection, id, peer);
   }
 
   closesocket(c);
@@ -210,7 +214,12 @@ void PTI::serverHandler(SOCKET c) {
     }
   }
 }
-
+void PTI::setResultHandler(
+    std::function<void(const std::vector<std::string> &, const std::string &,
+                       const std::string &)>
+        handler) {
+  m_result_handler = handler;
+}
 std::string PTI::createROOM() {
   Message m(Message::CREATE_ROOM);
   m_client.write(m.toBytes());

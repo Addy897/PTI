@@ -17,6 +17,17 @@ MCPServer::MCPServer() {
 void MCPServer::setHandler(std::function<void(SOCKET)> handler) {
   m_handler = handler;
 }
+std::string MCPServer::getPeer(SOCKET &c) {
+  SOCKADDR_IN addr;
+  int size = sizeof(addr);
+  int read = getpeername(c, (SOCKADDR *)&addr, &size);
+  if (read != SOCKET_ERROR) {
+    char *c = inet_ntoa(addr.sin_addr);
+    std::string s(c, strlen(c));
+    return s;
+  }
+  return "";
+}
 void MCPServer::start(bool non_block) {
   m_server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (m_server == INVALID_SOCKET) {

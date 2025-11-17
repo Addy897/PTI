@@ -1,0 +1,5 @@
+1.1.1.1
+bad.domain.com
+10.10.20.1
+8.8.8.8
+www.google.com
