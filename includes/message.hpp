@@ -1,7 +1,9 @@
 #pragma once
+#include "win.h"
 #include <cstdint>
 #include <string>
 #include <vector>
+#define CHUNK_SIZE 1024
 class Message {
 public:
   enum MessageType {
@@ -25,10 +27,15 @@ private:
 
 public:
   Message(MessageType type);
+
   static Message fromBytes(std::vector<uint8_t>);
+  static Message fromSocket(SOCKET &);
+
   void setData(std::vector<uint8_t>);
   void setData(std::string);
+
   std::vector<uint8_t> toBytes();
+
   MessageType getType();
   std::vector<uint8_t> getData();
   std::string getDataAsString();

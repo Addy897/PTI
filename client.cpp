@@ -1,4 +1,5 @@
 #include "includes/client.hpp"
+#include <cstdint>
 Client::Client() {
   WORD version = MAKEWORD(2, 2);
   int ret = WSAStartup(version, &wsdata);
@@ -41,6 +42,7 @@ int Client::read(size_t len, uint8_t buf[], int flags) {
     return SOCKET_ERROR;
   return recv(client, (char *)buf, len, flags);
 }
+Message Client::readMessage() { return Message::fromSocket(client); }
 void Client::close() {
   if (client != INVALID_SOCKET) {
     closesocket(client);

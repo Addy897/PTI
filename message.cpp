@@ -8,7 +8,11 @@ void Message::setData(std::vector<uint8_t> data) { m_data = data; }
 std::vector<uint8_t> Message::toBytes() {
   std::vector<uint8_t> bytes;
   bytes.push_back(m_type);
-  bytes.push_back(m_data.size());
+  int size = m_data.size();
+  bytes.push_back((size >> 24) & 0xFF);
+  bytes.push_back((size >> 16) & 0xFF);
+  bytes.push_back((size >> 8) & 0xFF);
+  bytes.push_back(size & 0xFF);
   bytes.insert(bytes.end(), m_data.begin(), m_data.end());
   return bytes;
 }
@@ -22,15 +26,49 @@ std::string Message::getDataAsString() {
     s.pop_back();
   return s;
 }
-Message Message::fromBytes(std::vector<uint8_t> data) {
-  if (data.size() < 1)
-    return Message(EMPTY);
-  MessageType type = static_cast<MessageType>(data[0]);
-  Message m(type);
-  if (data.size() > 2) {
 
-    m.setData(std::vector<uint8_t>{data.begin() + 2, data.end()});
+Message Message::fromSocket(SOCKET &c) {
+  uint8_t buf[CHUNK_SIZE];
+  int read = recv(c, (char *)buf, CHUNK_SIZE, 0);
+
+  if (read < 0) {
+    int ret = WSAGetLastError();
+    while (ret == WSAEWOULDBLOCK) {
+      Sleep(1000);
+      read = recv(c, (char *)buf, CHUNK_SIZE, 0);
+      if (read > 0)
+        break;
+      ret = WSAGetLastError();
+    }
   }
+  if (read < 0) {
+    Message m(Message::ERR);
+    m.setData("Read error");
+    return m;
+  } else {
+    MessageType type = static_cast<MessageType>(buf[0]);
+    int size = (buf[1] << 24) | (buf[2] << 16) | (buf[3] << 8) | buf[4];
+
+    Message m(type);
+    if (size > 0)
+      m.setData(std::vector<uint8_t>{buf + 5, buf + 5 + size});
+
+    return m;
+  }
+}
+
+Message Message::fromBytes(std::vector<uint8_t> data) {
+  if (data.size() < 5)
+    return Message(EMPTY);
+
+  MessageType type = (MessageType)data[0];
+  int size = (data[1] << 24) | (data[2] << 16) | (data[3] << 8) | data[4];
+
+  Message m(type);
+
+  if (data.size() >= 5 + size)
+    m.setData(std::vector<uint8_t>(data.begin() + 5, data.begin() + 5 + size));
+
   return m;
 }
 void print_message(Message &m) {

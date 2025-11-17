@@ -71,14 +71,8 @@ int SignalServer::write(SOCKET c, std::vector<uint8_t> data) {
 }
 void SignalServer::defaultHandler(SOCKET client) {
   while (running.load()) {
-    uint8_t buf[CHUNK_SIZE] = {0};
-    int read = recv(client, (char *)buf, CHUNK_SIZE, 0);
-    if (read == 0) {
-      break;
-    } else if (read > 0) {
-      Message m = Message::fromBytes(std::vector<uint8_t>{buf, buf + read});
-      handle_message(client, m);
-    }
+    Message m = Message::fromSocket(client);
+    handle_message(client, m);
   }
   closesocket(client);
 }

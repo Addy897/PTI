@@ -1,4 +1,5 @@
 #pragma once
+#include "message.hpp"
 #include "win.h"
 #include <cstdint>
 #include <iostream>
@@ -12,6 +13,7 @@ public:
   void close();
   int write(std::vector<uint8_t>);
   int read(size_t, uint8_t[], int flags = 0);
+  Message readMessage();
 
 protected:
   WSAData wsdata;
