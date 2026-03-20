@@ -2,7 +2,7 @@
 #include <atomic>
 #include <functional>
 #include <string>
-#include <winsock2.h>
+#include "win.h"
 #define CHUNK_SIZE 1024
 class Server {
 public:
@@ -12,7 +12,7 @@ public:
   ~Server();
   virtual void defaultHandler(SOCKET client);
   void start();
-  void close();
+  void disconn();
   bool m_start_non_block = false;
   std::function<void(SOCKET)> m_handler;
   std::atomic<int> m_total_clients;
@@ -23,7 +23,9 @@ protected:
   int m_port;
 
   void show_clients();
+#ifdef _WIN32
   WSAData m_wsdata;
+#endif 
   SOCKET m_server;
   sockaddr_in m_server_addr = {0};
 };

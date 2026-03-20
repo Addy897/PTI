@@ -74,4 +74,28 @@ typedef struct tagBITMAPINFOHEADER {
 #if defined(_MSC_VER) || defined(__TINYC__)
 #include "propidl.h"
 #endif
+
+#elif defined(__linux__)
+
+#include <sys/socket.h>
+typedef int SOCKET;
+  #include <pthread.h>
+  #include <unistd.h>
+  #include <arpa/inet.h>
+  #include <netinet/in.h>
+  #include <errno.h>
+ #include <sys/ioctl.h>
+  typedef void* LPVOID;
+  #define closesocket close
+  #define INVALID_SOCKET -1
+  #define SOCKET_ERROR -1
+  #define SOCKADDR        struct sockaddr
+  #define SOCKADDR_IN     struct sockaddr_in
+  #define WSAEWOULDBLOCK EWOULDBLOCK
+#define ioctlsocket ioctl
+#define Sleep sleep
+  inline int WSAGetLastError(){
+	return errno;
+  }
+
 #endif

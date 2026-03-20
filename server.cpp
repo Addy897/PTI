@@ -1,18 +1,18 @@
 #include "includes/server.hpp"
 #include <functional>
 #include <iostream>
-#include <psdk_inc/_socket_types.h>
 #include <thread>
 #include <vector>
-#include <winsock2.h>
 Server::Server(std::string hostname, int port) {
-  WORD version = MAKEWORD(2, 2);
-  int ret = WSAStartup(version, &m_wsdata);
-  if (ret) {
-    char error[100];
-    sprintf_s(error, "WSA initialization failed: %d.", ret);
-    throw std::runtime_error(error);
-  }
+#ifdef _WIN32
+	  WORD version = MAKEWORD(2, 2);
+	  int ret = WSAStartup(version, &m_wsdata);
+	  if (ret) {
+	    char error[100];
+	    sprintf_s(error, "WSA initialization failed: %d.", ret);
+	    throw std::runtime_error(error);
+	  }
+#endif
   m_total_clients = 0;
   m_server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (m_server == INVALID_SOCKET) {
@@ -47,21 +47,23 @@ void Server::start() {
 
   int ret = bind(m_server, (SOCKADDR *)&m_server_addr, sizeof(m_server_addr));
   if (ret == SOCKET_ERROR) {
-    ret = WSAGetLastError();
-    std::cout << "Bind failed " << ret << "\n";
+     
+    std::cout << "Bind failed " <<  WSAGetLastError() << "\n";
     return;
   }
   ret = listen(m_server, 5);
   if (ret == SOCKET_ERROR) {
-    ret = WSAGetLastError();
-    switch (ret) {
+    switch (WSAGetLastError()) {
     case EADDRINUSE:
       throw std::runtime_error(
           "Another socket is already listening on the same port.");
     default: {
       char error[100];
+#ifdef _WIN32
       sprintf_s(error, "listen failed on port :%d ret :%d.", m_port, ret);
-
+#elif defined(__linux__)
+      snprintf(error,sizeof(error),"listen failed on port :%d ret :%d.", m_port, ret);
+#endif     
       throw std::runtime_error(error);
     }
     }
@@ -113,7 +115,7 @@ void Server::defaultHandler(SOCKET client) {
   }
   closesocket(client);
 }
-void Server::close() {
+void Server::disconn() {
   if (m_server != INVALID_SOCKET) {
     closesocket(m_server);
     m_server = INVALID_SOCKET;
@@ -121,6 +123,8 @@ void Server::close() {
 }
 
 Server::~Server() {
-  close();
+  disconn();
+#ifdef _WIN32
   WSACleanup();
+#endif
 }

@@ -32,15 +32,14 @@ Message Message::fromSocket(SOCKET &c) {
   int read = recv(c, (char *)buf, CHUNK_SIZE, 0);
 
   if (read < 0) {
-    int ret = WSAGetLastError();
-    while (ret == WSAEWOULDBLOCK) {
+   
+    while ( WSAGetLastError() == WSAEWOULDBLOCK) {
       Sleep(1000);
       read = recv(c, (char *)buf, CHUNK_SIZE, 0);
       if (read > 0)
         break;
-      ret = WSAGetLastError();
     }
-  }
+   }
   if (read < 0) {
     Message m(Message::ERR);
     m.setData("Read error");

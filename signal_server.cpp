@@ -3,17 +3,15 @@
 #include <atomic>
 #include <iostream>
 #include <mutex>
-#include <psdk_inc/_socket_types.h>
 #include <random>
 #include <string>
 #include <thread>
-#include <winsock2.h>
 std::atomic<bool> running(true);
 void SignalServer::handle_message(SOCKET client, Message &m) {
   switch ((int)m.getType()) {
   case Message::CREATE_ROOM: {
     SOCKADDR_IN addr;
-    int size = sizeof(addr);
+    unsigned int size = sizeof(addr);
     int read = getpeername(client, (SOCKADDR *)&addr, &size);
     if (read != SOCKET_ERROR) {
       char *c = inet_ntoa(addr.sin_addr);
@@ -43,7 +41,9 @@ void SignalServer::handle_message(SOCKET client, Message &m) {
         if (m_rooms.contains(id)) {
           ms.setData(m_rooms[id]);
           m_rooms.erase(id);
-        }
+        }else{
+	  break;
+	}
       }
       write(client, ms.toBytes());
     }
@@ -101,6 +101,6 @@ int main() {
   static SignalServer s("", 4444);
   std::thread t([]() { handle_cli(s); });
   s.start();
-  atexit([]() { s.close(); });
+  atexit([]() { s.disconn(); });
   return 0;
 }

@@ -2,9 +2,8 @@
 #include "includes/message.hpp"
 #include <string>
 #include <thread>
-
 #include <fstream>
-#include <functional> // for std::hash
+#include <openssl/sha.h>
 #include <sstream>
 #include <unordered_set>
 
@@ -20,14 +19,10 @@ PTI::PTI(std::string ip, int port) {
 }
 Message PTI::getMessage(SOCKET c) { return Message::fromSocket(c); }
 
-// Simple salted hash for "privacy" (for real security, use SHA-256 lib)
 std::string PTI::hashIndicator(const std::string &indicator) {
-  static const std::string salt = "pti_demo_salt";
-  std::hash<std::string> hasher;
-  size_t h = hasher(indicator + salt);
-  std::stringstream ss;
-  ss << std::hex << h;
-  return ss.str();
+ unsigned char hash[32];
+  SHA256((unsigned char *)indicator.data(), indicator.size(), hash);
+  return std::string{hash,hash+32};
 }
 
 std::vector<std::string>
@@ -220,7 +215,7 @@ void PTI::setResultHandler(
         handler) {
   m_result_handler = handler;
 }
-std::string PTI::createROOM() {
+  std::string PTI::createROOM() {
   Message m(Message::CREATE_ROOM);
   m_client.write(m.toBytes());
   Message m1 = m_client.readMessage();
@@ -257,28 +252,28 @@ void PTI::start() {
 
   m_client.conn(m_server_ip, m_server_port);
 }
-#ifdef PTI_CLI
-int main() {
-  PTI pti("127.0.0.1");
-  pti.loadIndicatorsFromFile("indicators.txt");
-  pti.start();
-  std::string input;
-  while (pti.m_running.load()) {
-    std::cout << ">> ";
-    std::getline(std::cin, input);
-    if (input == "q") {
-      pti.m_running.store(false);
-    }
-    if (input == "ROOMS") {
-      std::cout << "Rooms: " << pti.getRooms() << "\n";
-    } else if (input == "CREATE_ROOM") {
-      std::cout << "ID: " << pti.createROOM() << "\n";
-    } else if (input == "JOIN_ROOM") {
-      std::cout << "ID: ";
-      std::string id;
-      std::getline(std::cin, id);
-      pti.joinRoom(id);
-    }
-  }
-}
-#endif
+//#ifdef PTI_CLI
+//int main() {
+//  PTI pti("127.0.0.1");
+//  pti.loadIndicatorsFromFile("indicators.txt");
+//  pti.start();
+//  std::string input;
+//  while (pti.m_running.load()) {
+//    std::cout << ">> ";
+//    std::getline(std::cin, input);
+//    if (input == "q") {
+//      pti.m_running.store(false);
+//    }
+//    if (input == "ROOMS") {
+//      std::cout << "Rooms: " << pti.getRooms() << "\n";
+//    } else if (input == "CREATE_ROOM") {
+//      std::cout << "ID: " << pti.createROOM() << "\n";
+//    } else if (input == "JOIN_ROOM") {
+//      std::cout << "ID: ";
+//      std::string id;
+//      std::getline(std::cin, id);
+//      pti.joinRoom(id);
+//    }
+//  }
+//}
+//#endif

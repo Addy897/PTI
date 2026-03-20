@@ -17,8 +17,9 @@ public:
 private:
   std::string m_hostname = "";
   int m_port = 1234;
-
+#ifdef _WIN32
   WSAData m_wsdata;
+#endif
   SOCKET m_server;
   sockaddr_in m_server_addr = {0};
 };

@@ -1,17 +1,20 @@
 #include "includes/mcp_server.hpp"
 #include <functional>
+#include <string.h>
 #include <iostream>
 #include <stdexcept>
 #include <thread>
 #include <vector>
 MCPServer::MCPServer() {
-  WORD version = MAKEWORD(2, 2);
-  int ret = WSAStartup(version, &m_wsdata);
-  if (ret) {
-    char error[100];
-    sprintf_s(error, "WSA initialization failed: %d.", ret);
-    throw std::runtime_error(error);
-  }
+  #ifdef _WIN32
+	  WORD version = MAKEWORD(2, 2);
+	  int ret = WSAStartup(version, &m_wsdata);
+	  if (ret) {
+	    char error[100];
+	    sprintf_s(error, "WSA initialization failed: %d.", ret);
+	    throw std::runtime_error(error);
+	  }
+#endif
 }
 
 void MCPServer::setHandler(std::function<void(SOCKET)> handler) {
@@ -19,7 +22,7 @@ void MCPServer::setHandler(std::function<void(SOCKET)> handler) {
 }
 std::string MCPServer::getPeer(SOCKET &c) {
   SOCKADDR_IN addr;
-  int size = sizeof(addr);
+  unsigned int size = sizeof(addr);
   int read = getpeername(c, (SOCKADDR *)&addr, &size);
   if (read != SOCKET_ERROR) {
     char *c = inet_ntoa(addr.sin_addr);
@@ -59,8 +62,12 @@ void MCPServer::start(bool non_block) {
           "Another socket is already listening on the same port.");
     default: {
       char error[100];
+#ifdef _WIN32
       sprintf_s(error, "listen failed on port :%d ret :%d.", m_port, ret);
-
+#elif defined(__linux__)
+      
+      sprintf(error, "listen failed on port :%d ret :%d.", m_port, ret);
+#endif
       throw std::runtime_error(error);
     }
     }
@@ -105,5 +112,7 @@ MCPServer::~MCPServer() {
     closesocket(m_server);
     m_server = INVALID_SOCKET;
   }
+#ifdef _WIN32
   WSACleanup();
+#endif
 }

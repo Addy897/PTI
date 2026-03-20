@@ -1,13 +1,15 @@
 #include "includes/client.hpp"
 #include <cstdint>
 Client::Client() {
-  WORD version = MAKEWORD(2, 2);
-  int ret = WSAStartup(version, &wsdata);
-  if (ret) {
-    char error[100];
-    sprintf_s(error, "WSA initialization failed: %d.", ret);
-    throw std::runtime_error(error);
-  }
+  #ifdef win32
+	  WORD version = MAKEWORD(2, 2);
+	  int ret = WSAStartup(version, &wsdata);
+	  if (ret) {
+	    char error[100];
+	    sprintf_s(error, "WSA initialization failed: %d.", ret);
+	    throw std::runtime_error(error);
+	  }
+  #endif
 
   client = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
   if (client == INVALID_SOCKET) {
@@ -43,13 +45,15 @@ int Client::read(size_t len, uint8_t buf[], int flags) {
   return recv(client, (char *)buf, len, flags);
 }
 Message Client::readMessage() { return Message::fromSocket(client); }
-void Client::close() {
+void Client::discon() {
   if (client != INVALID_SOCKET) {
     closesocket(client);
     client = INVALID_SOCKET;
   }
 }
 Client::~Client() {
-  close();
+	discon();
+#ifdef _WIN32
   WSACleanup();
+#endif
 }
