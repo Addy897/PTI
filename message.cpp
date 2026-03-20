@@ -49,8 +49,36 @@ Message Message::fromSocket(SOCKET &c) {
     int size = (buf[1] << 24) | (buf[2] << 16) | (buf[3] << 8) | buf[4];
 
     Message m(type);
-    if (size > 0)
-      m.setData(std::vector<uint8_t>{buf + 5, buf + 5 + size});
+    if (size > 0) {
+      std::vector<uint8_t> data;
+      int start = 5;
+      while (size >= CHUNK_SIZE) {
+        data.insert(data.end(), buf + start, buf  + CHUNK_SIZE);
+        size -= CHUNK_SIZE - start;
+        start = 0;
+
+        read = recv(c, (char *)buf, CHUNK_SIZE, 0);
+
+        if (read < 0) {
+          int ret = WSAGetLastError();
+          while (ret == WSAEWOULDBLOCK) {
+            Sleep(1000);
+            read = recv(c, (char *)buf, CHUNK_SIZE, 0);
+            if (read > 0)
+              break;
+            ret = WSAGetLastError();
+          }
+        }
+        if (read < 0) {
+          Message m(Message::ERR);
+          m.setData("Read error");
+          return m;
+        }
+      }
+      data.insert(data.end(), buf + start, buf + start + size);
+      m.setData(data);
+    }
+
 
     return m;
   }

@@ -3,18 +3,28 @@
 #include "includes/raylib.h"
 #include <filesystem>
 #include <format>
+#include <mutex>
 #define RAYGUI_IMPLEMENTATION
 #include "includes/raygui.h"
 
 #include <string>
-std::string logText = "";
+std::vector<std::string> logLines;
+std::mutex logMutex;
+
+void add_to_log(std::string msg) {
+  std::lock_guard<std::mutex> lock(logMutex);
+  logLines.push_back(msg);
+}
 
 void handler(const std::vector<std::string> &result, const std::string &id,
              const std::string &peer) {
-  logText += "Got Intersection from " + peer + " for room: " + id + "\n\t";
-  logText += std::format("Found {} common indicators.\n", result.size());
-  for (const std::string &i : result) {
-    logText += "\t" + i + "\n";
+  std::lock_guard<std::mutex> lock(logMutex);
+  logLines.push_back(
+      std::format("Got Intersection from {} for room: {}", peer, id));
+  logLines.push_back(
+      std::format("  Found {} common indicators.", result.size()));
+  for (const auto &i : result) {
+    logLines.push_back("    " + i);
   }
 }
 int main() {
@@ -49,7 +59,7 @@ int main() {
         try {
           pti.start();
           connected = true;
-          logText += "Connected to server.\n";
+          add_to_log("Connected to server.\n");
         } catch (std::runtime_error &e) {
           show_error = true;
           error = e.what();
@@ -61,7 +71,7 @@ int main() {
 
     if (GuiButton(Rectangle{50, 100, 120, 30}, "Get Rooms")) {
       std::string rooms = pti.getRooms();
-      logText += "Rooms: " + rooms + "\n";
+      add_to_log("Rooms: " + rooms + "\n");
     }
 
     if (GuiButton(Rectangle{50, 150, 120, 30}, "Create Room")) {
@@ -88,22 +98,8 @@ int main() {
       }
     }
     GuiGroupBox(Rectangle{50, 250, 700, 300}, "Logs");
-    std::vector<std::string> lines;
-    {
-      std::string tmp;
-      for (char c : logText) {
-        if (c == '\n') {
-          lines.push_back(tmp);
-          tmp.clear();
-        } else {
-          tmp.push_back(c);
-        }
-      }
-      if (!tmp.empty())
-        lines.push_back(tmp);
-    }
 
-    float contentHeight = lineHeight * lines.size();
+    float contentHeight = lineHeight * logLines.size();
     if (contentHeight < panelRec.height)
       contentHeight = panelRec.height;
     panelContentRec.height = contentHeight;
@@ -116,13 +112,24 @@ int main() {
     BeginScissorMode((int)panelRec.x, (int)panelRec.y, (int)panelRec.width,
                      (int)panelRec.height);
     {
-      Vector2 pos = {panelRec.x + panelScroll.x, panelRec.y + panelScroll.y};
-      for (size_t i = 0; i < lines.size(); i++) {
-        DrawText(lines[i].c_str(), pos.x, pos.y + i * lineHeight, FONT_SIZE,
+      std::lock_guard<std::mutex> lock(logMutex);
+
+      int firstLine = (int)(-panelScroll.y / lineHeight);
+      int lastLine = firstLine + (int)(panelRec.height / lineHeight) + 2;
+      if (firstLine < 0)
+        firstLine = 0;
+      if (lastLine > (int)logLines.size())
+        lastLine = (int)logLines.size();
+
+      for (int i = firstLine; i < lastLine; i++) {
+        float posY = panelRec.y + panelScroll.y + (i * lineHeight);
+        DrawText(logLines[i].c_str(), panelRec.x + 5, (int)posY, FONT_SIZE,
                  BLACK);
       }
     }
     EndScissorMode();
+
+    panelContentRec.height = logLines.size() * lineHeight;
     if (showFileDialog) {
       Rectangle msgBoxRec = {200, 150, 400, 150};
       if (GuiWindowBox(msgBoxRec, "Indicator File")) {
@@ -145,14 +152,13 @@ int main() {
         } else {
           try {
             pti.loadIndicatorsFromFile(indicatorFilePath);
-
             if (join) {
               pti.joinRoom(joinRoomID);
-              logText += "Joining Room: " + std::string(joinRoomID) + "\n";
+              add_to_log("Joining Room: " + std::string(joinRoomID) + "\n");
               joinRoomID[0] = '\0';
             } else {
               std::string id = pti.createROOM();
-              logText += "Created Room ID: " + id + "\n";
+              add_to_log("Created Room ID: " + id + "\n");
             }
 
           } catch (std::runtime_error &err) {
@@ -165,7 +171,6 @@ int main() {
         showFileDialog = false;
       }
     }
-
     EndDrawing();
   }
 
