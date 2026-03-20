@@ -32,12 +32,37 @@ std::stringstream ss;
 
 std::vector<std::string>
 PTI::hashIndicators(const std::vector<std::string> &indicators) {
-  std::vector<std::string> res;
-  res.reserve(indicators.size());
+std::vector<std::string> res;
+res.reserve(indicators.size());
+std::mutex res_mutex;
 
-  for (int i =0;i<indicators.size();i++) {
-    res.push_back(hashIndicator(indicators[i]));
-  }
+auto func = [&](int start, int end) {
+    for (int i = start; i < end && i < indicators.size(); i++) {
+        std::string hashed = hashIndicator(indicators[i]);
+        {
+            std::lock_guard<std::mutex> lock(res_mutex);
+            res.push_back(std::move(hashed)); 
+        }
+    }
+};
+
+std::vector<std::thread> threads;
+int num_threads = 5;
+int chunk_size = (indicators.size() + num_threads - 1) / num_threads; 
+
+for (int i = 0; i < num_threads; ++i) {
+    int start = i * chunk_size;
+    int end = std::min(start + chunk_size, (int)indicators.size());
+    
+    if (start < indicators.size()) {
+        threads.emplace_back(func, start, end);
+    }
+}
+
+for (auto &t : threads) {
+    t.join();
+}
+
   return res;
 }
 
@@ -60,9 +85,9 @@ std::vector<std::string> PTI::splitLines(const std::string &data) {
     std::vector<std::string> res;
     size_t start = 0, end;
 	while ((end = data.find('\n', start)) != std::string::npos) {
-    res.push_back(trim(data.substr(start, end - start)));
-    start = end + 1;
-}
+	    res.push_back(trim(data.substr(start, end - start)));
+	    start = end + 1;
+	}
     return res;
 }
 
