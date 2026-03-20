@@ -29,57 +29,52 @@ std::string Message::getDataAsString() {
 
 Message Message::fromSocket(SOCKET &c) {
   uint8_t buf[CHUNK_SIZE];
-  int read = recv(c, (char *)buf, CHUNK_SIZE, 0);
+  uint8_t hdr[5];
+  int read = recv(c, (char *)hdr, 5, 0);
 
   if (read < 0) {
-   
-    while ( WSAGetLastError() == WSAEWOULDBLOCK) {
-      Sleep(1000);
-      read = recv(c, (char *)buf, CHUNK_SIZE, 0);
-      if (read > 0)
-        break;
-    }
+  	 while ( WSAGetLastError() == WSAEWOULDBLOCK) {
+		      Sleep(1000);
+		      read = recv(c, (char *)buf, CHUNK_SIZE, 0);
+		      if (read > 0)
+			break;
+}		 
+    
    }
   if (read < 0) {
     Message m(Message::ERR);
     m.setData("Read error");
     return m;
   } else {
-    MessageType type = static_cast<MessageType>(buf[0]);
-    int size = (buf[1] << 24) | (buf[2] << 16) | (buf[3] << 8) | buf[4];
+    MessageType type = static_cast<MessageType>(hdr[0]);
+    int size = (hdr[1] << 24) | (hdr[2] << 16) | (hdr[3] << 8) | hdr[4];
 
     Message m(type);
     if (size > 0) {
-      std::vector<uint8_t> data;
-      int start = 5;
-      while (size >= CHUNK_SIZE) {
-        data.insert(data.end(), buf + start, buf  + CHUNK_SIZE);
-        size -= CHUNK_SIZE - start;
-        start = 0;
-
-        read = recv(c, (char *)buf, CHUNK_SIZE, 0);
-
-        if (read < 0) {
-          int ret = WSAGetLastError();
-          while (ret == WSAEWOULDBLOCK) {
-            Sleep(1000);
-            read = recv(c, (char *)buf, CHUNK_SIZE, 0);
-            if (read > 0)
-              break;
-            ret = WSAGetLastError();
-          }
+        std::vector<uint8_t> data;
+        data.reserve(size);
+        
+        while ((int)data.size() < size) {
+            int remaining = size - data.size();
+            int toRead = std::min(remaining, CHUNK_SIZE);
+            read = recv(c, (char*)buf, toRead, 0);
+            if (read < 0) {
+                while ( WSAGetLastError() == WSAEWOULDBLOCK) {
+		      Sleep(1000);
+		      read = recv(c, (char *)buf, CHUNK_SIZE, 0);
+		      if (read > 0)
+			break;
+		}
+		if(read < 0){
+			Message m(Message::ERR);
+    m.setData("Read error");
+    return m;
+		}
+            }
+            data.insert(data.end(), buf, buf + read); 
         }
-        if (read < 0) {
-          Message m(Message::ERR);
-          m.setData("Read error");
-          return m;
-        }
-      }
-      data.insert(data.end(), buf + start, buf + start + size);
-      m.setData(data);
+        m.setData(data);
     }
-
-
     return m;
   }
 }

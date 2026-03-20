@@ -3,7 +3,6 @@
 #include <functional>
 #include <string>
 #include "win.h"
-#define CHUNK_SIZE 1024
 class Server {
 public:
   Server(std::string hostname, int port);

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <thread>
 #include <vector>
+#include "includes/message.hpp"
 Server::Server(std::string hostname, int port) {
 #ifdef _WIN32
 	  WORD version = MAKEWORD(2, 2);

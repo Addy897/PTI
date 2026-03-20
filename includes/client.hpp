@@ -10,7 +10,6 @@ typedef int SOCKET;
 #include <cstdint>
 #include <iostream>
 #include <vector>
-#define CHUNK_SIZE 1024
 class Client {
 public:
   Client();

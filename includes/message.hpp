@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #define CHUNK_SIZE 1024
+
 class Message {
 public:
   enum MessageType {

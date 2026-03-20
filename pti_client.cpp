@@ -34,8 +34,9 @@ std::vector<std::string>
 PTI::hashIndicators(const std::vector<std::string> &indicators) {
   std::vector<std::string> res;
   res.reserve(indicators.size());
-  for (const auto &ind : indicators) {
-    res.push_back(hashIndicator(ind));
+
+  for (int i =0;i<indicators.size();i++) {
+    res.push_back(hashIndicator(indicators[i]));
   }
   return res;
 }
@@ -149,6 +150,7 @@ void PTI::clientHandler(std::string peer, std::string id) {
   if (peerMsg.getType() != Message::PSI_DATA) {
     std::cout << "[PSI] Expected PSI_DATA, got type " << peerMsg.getType()
               << "\n";
+    print_message(peerMsg);
     return;
   }
 
